@@ -1,4 +1,4 @@
-library manager;
+library ipkg;
 
 import "dart:io";
 
