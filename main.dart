@@ -90,11 +90,13 @@ void main(List<String> args, port) {
     }
     void remove(String queuedPackage) {
       if (!checkLocalRepo()) return;
-      Process.run("rm", ["-r", queuedPackage]).then((p) {
+      Process.run("rm", ["-r", "plugins/${queuedPackage}"]).then((p) {
         if (p.exitCode == 0) {
           reply("${queuedPackage} has been successfully removed!");
         } else {
           reply("${queuedPackage} failed while the remove occurred(error code ${p.exitCode}).");
+          print("REMOVE FAILURE");
+          print(p.stderr);
         }
       });
     }
