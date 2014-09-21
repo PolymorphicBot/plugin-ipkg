@@ -66,7 +66,6 @@ void main(List<String> args, port) {
       for (var possibleDir in contents) {
         if (possibleDir is Directory) {
           packagesQueued++;
-          print("Packages in queue: ${packagesQueued}");
           Process.run("git", ["pull"], workingDirectory: possibleDir.path).then((p) {
             String stdout = p.stdout;
             print(stdout);
@@ -76,10 +75,12 @@ void main(List<String> args, port) {
               success++;
             } else {
               fail++;
-              print("FAILURE FOR ${possibleDir.path}");
+              print("PACKGE FAILURE");
+              print("==============");
+              print(possibleDir.path);
               print(stdout);
+              print("==============");
             }
-            print("Package unqueued");
             packagesQueued--;
             if (packagesQueued == 0) {
               reply("${success} packages upgraded, ${already} packages already up-to-date, ${fail} packages failed upgrading.");
@@ -95,8 +96,11 @@ void main(List<String> args, port) {
           reply("${queuedPackage} has been successfully removed!");
         } else {
           reply("${queuedPackage} failed while the remove occurred(error code ${p.exitCode}).");
-          print("REMOVE FAILURE");
+          print("PACKAGE FAILURE");
+          print("==============");
+          print(queuedPackage);
           print(p.stderr);
+          print("==============");
         }
       });
     }
@@ -135,6 +139,10 @@ void main(List<String> args, port) {
       require("manage.update-repo", () {
         reply("Updating repo!");
         updateRepo();
+      });
+    } else if (event.args[0].toLowerCase() == "queue" && event.args.length == 1) {
+      require("info.queue", () {
+        reply("Packages in queue: ${Color.CYAN}${packagesQueued}");
       });
     } else {}
   });
