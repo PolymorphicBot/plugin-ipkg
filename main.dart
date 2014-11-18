@@ -19,7 +19,7 @@ int packagesQueued = 0;
 void main(List<String> args, port) {
   bot = new BotConnector(port);
   eventManager = bot.createEventManager();
-  
+
   eventManager.command("ipkg", (event) {
     void reply(String content) {
       event.reply("${prefix} ${content}");
@@ -45,95 +45,106 @@ void main(List<String> args, port) {
         }
       });
     }
-    void update(String queuedPackage) {
-      Process.run("git", ["pull"], workingDirectory: "plugins/${queuedPackage}").then((p) {
+    void upgrade(String queuedPackage) {
+      var p = Process.runSync("git", ["pull"], workingDirectory: "plugins/${queuedPackage}");
+      {
         String stdout = p.stdout;
         if (p.exitCode == 0 && stdout.contains("Already up-to-date.")) {
           reply("Plugin already up to date!");
         } else if (p.exitCode == 0) {
-          reply("Plugin updated!");
+          reply("Plugin upgraded!");
         } else {
-          reply("There was a problem updating(exit code ${p.exitCode}");
+          reply("${queuedPackage} failed to be upgraded(${p.exitCode}).");
         }
-      });
+      }
     }
     void upgradeAll() {
       if (!checkLocalRepo()) return;
       List contents = new Directory('plugins/').listSync();
-      int already = 0;
+      int latest = 0;
       int success = 0;
       int fail = 0;
       for (var possibleDir in contents) {
         if (possibleDir is Directory) {
-          packagesQueued++;
-          Process.run("git", ["pull"], workingDirectory: possibleDir.path).then((p) {
+          var p = Process.runSync("git", ["pull"], workingDirectory: possibleDir.path);
+          {
             String stdout = p.stdout;
-            print(stdout);
             if (p.exitCode == 0 && stdout.contains("Already up-to-date.")) {
-              already++;
+              latest++;
             } else if (p.exitCode == 0) {
               success++;
             } else {
               fail++;
-              print("PACKGE FAILURE");
-              print("==============");
+              print("PACKAGE FAILURE");
+              print("===============");
               print(possibleDir.path);
               print(stdout);
-              print("==============");
+              print("===============");
             }
-            packagesQueued--;
-            if (packagesQueued == 0) {
-              reply("${success} packages upgraded, ${already} packages already up-to-date, ${fail} packages failed upgrading.");
-            }
-          });
+          }
         }
+      }
+      if (success == 0 && fail == 0) {
+        reply("No operations were performed on ${latest} packages.");
+      } else {
+        reply("${success} packages were upgraded, ${fail} packages failed upgrading.");
       }
     }
     void remove(String queuedPackage) {
       if (!checkLocalRepo()) return;
-      Process.run("rm", ["-r", "plugins/${queuedPackage}"]).then((p) {
+      ProcessResult p = Process.run("rm", ["-r", "plugins/${queuedPackage}"]);
+      {
         if (p.exitCode == 0) {
-          reply("${queuedPackage} has been successfully removed!");
+          reply("${queuedPackage} was removed");
         } else {
-          reply("${queuedPackage} failed while the remove occurred(error code ${p.exitCode}).");
-          print("PACKAGE FAILURE");
+          reply("${queuedPackage} failed to be removed(${p.exitCode}).");
+          print("PACKAGE FAILED");
           print("==============");
           print(queuedPackage);
           print(p.stderr);
           print("==============");
         }
-      });
+      }
     }
     void updateRepo() {
       new HttpClient().getUrl(Uri.parse(repo))
           .then((HttpClientRequest request) => request.close())
-          .then((HttpClientResponse response) => 
-              response.pipe(new File('plugins.json').openWrite()));
+          .then((HttpClientResponse response) =>
+            response.pipe(new File('plugins.json').openWrite()));
+    }
+    void reload() {
+      bot.send("reload-plugins", {
+        "network": event.network
+      });
     }
     if (event.args.length == 0) {
-      reply("Subcommands: install [package], update [package], upgrade, remove [package], update-repo");
+      reply("Subcommands: install [package], upgrade [package], upgrade-all, remove [package], update-repo");
     } else if (event.args[0].toLowerCase() == "install" && event.args.length >= 2) {
       require("manage.install", () {
         String queuedPackage = event.args[1];
         reply("Queuing ${queuedPackage} to install");
         install(queuedPackage);
+        reload();
       });
-    } else if (event.args[0].toLowerCase() == "update" && event.args.length >= 2) {
-      require("manage.update", () {
-        String queuedPackage = event.args[1];
-        reply("Queuing ${queuedPackage} to update");
-        update(queuedPackage);
-      });
-    } else if (event.args[0].toLowerCase() == "upgrade" && event.args.length == 1) {
+    } else if (event.args[0].toLowerCase() == "upgrade" && event.args.length >= 2) {
       require("manage.upgrade", () {
-        reply("Queuing all packages to update");
+        String queuedPackage = event.args[1];
+        reply("Queuing ${queuedPackage} to upgrade");
+        upgrade(queuedPackage);
+        reload();
+      });
+    } else if (event.args[0].toLowerCase() == "upgrade-all" && event.args.length == 1) {
+      require("manage.upgrade", () {
+        reply("Queuing all packages to upgrade");
         upgradeAll();
+        reload();
       });
     } else if (event.args[0].toLowerCase() == "remove" && event.args.length == 2) {
       require("manage.remove", () {
         String queuedPackage = event.args[1];
         reply("Queuing ${queuedPackage} to remove");
         remove(queuedPackage);
+        reload();
       });
     } else if (event.args[0].toLowerCase() == "update-repo" && event.args.length == 1) {
       require("manage.update-repo", () {
