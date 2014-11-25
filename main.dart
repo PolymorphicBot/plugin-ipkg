@@ -108,7 +108,7 @@ void main(List<String> args, port) {
       }
     }
     void status(String package) {
-      ProcessResult p = Process.runSync("git", ["status"], workingDirectory: "plugins/${package}");
+      ProcessResult p = Process.runSync("git", ["status", "--short"], workingDirectory: "plugins/${package}");
       {
         if (p.exitCode == 0) {
           var split = p.stdout.trim().split('\n');
