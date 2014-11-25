@@ -129,13 +129,25 @@ void main(List<String> args, port) {
       }
     }
     void commit(String package, String commitMessage) {
-      ProcessResult p = Process.runSync("git", ["commit", "-m" "\"${commitMessage}\""], workingDirectory: "plugins/${package}");
+      ProcessResult p = Process.runSync("git", ["commit", "-m" "${commitMessage}"], workingDirectory: "plugins/${package}");
       {
         if (p.exitCode == 0) {
           reply("Commit successful(${commitMessage}).");
         } else {
           reply("Commit failed.");
           // TODO implement logging when log system is finished.
+        }
+      }
+    }
+    void push(String package, String args) {
+      var cArgs = ["push",]..addAll(args);
+      ProcessResult p = Process.runSync("git", cArgs, workingDirectory: "plugins/${package}");
+      {
+        if (p.exitCode == 0) {
+          reply("Push success.");
+        } else {
+          reply("Push failed.");
+          reply(p.stderr);
         }
       }
     }
@@ -208,6 +220,14 @@ void main(List<String> args, port) {
         commitMessageSplit.remove("commit");
         commitMessageSplit.remove(package);
         commit(package, commitMessageSplit.join(' '));
+      });
+    } else if (event.args[0].toLowerCase() == "push" && event.args.length >= 2) {
+      require("dev.push", () {
+        var package = event.args[1];
+        var args = event.args;
+        args.remove("push");
+        args.remove(package);
+        push(package, args);
       });
     }
   });
