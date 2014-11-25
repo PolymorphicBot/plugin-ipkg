@@ -37,13 +37,14 @@ void main(List<String> args, port) {
     }
     void install(String queuedPackage) {
       if (!checkLocalRepo()) return;
-      Process.run("git", ["clone", "git://github.com/PolymorphicBot/${queuedPackage}.git", "plugins/${queuedPackage}"]).then((p) {
+      ProcessResult p = Process.runSync("git", ["clone", "git://github.com/PolymorphicBot/${queuedPackage}.git", "plugins/${queuedPackage}"]);
+      {
         if (p.exitCode == 0) {
           reply("${queuedPackage} has been successfully installed!");
         } else {
           reply("${queuedPackage} failed while the Git clone occurred(error code ${p.exitCode}).");
         }
-      });
+      }
     }
     void upgrade(String queuedPackage) {
       var p = Process.runSync("git", ["pull"], workingDirectory: "plugins/${queuedPackage}");
@@ -106,6 +107,38 @@ void main(List<String> args, port) {
         }
       }
     }
+    void status(String package) {
+      ProcessResult p = Process.runSync("git", ["status"], workingDirectory: "plugins/${package}");
+      {
+        if (p.exitCode == 0) {
+          var split = p.stdout.trim().split('\n');
+          split.forEach(event.replyNotice);
+        } else {
+          reply("Not a git repository.");
+        }
+      }
+    }
+    void add(String package, String files) {
+      ProcessResult p = Process.runSync("git", ["add", files], workingDirectory: "plugins/${package}");
+      {
+        if (p.exitCode == 0) {
+          reply("Success!");
+        } else {
+          reply("Failure.");
+        }
+      }
+    }
+    void commit(String package, String commitMessage) {
+      ProcessResult p = Process.runSync("git", ["commit", "-m" "\"${commitMessage}\""], workingDirectory: "plugins/${package}");
+      {
+        if (p.exitCode == 0) {
+          reply("Commit successful(${commitMessage}).");
+        } else {
+          reply("Commit failed.");
+          // TODO implement logging when log system is finished.
+        }
+      }
+    }
     void updateRepo() {
       new HttpClient().getUrl(Uri.parse(repo))
           .then((HttpClientRequest request) => request.close())
@@ -155,6 +188,27 @@ void main(List<String> args, port) {
       require("info.queue", () {
         reply("Packages in queue: ${Color.CYAN}${packagesQueued}");
       });
-    } else {}
+    } else if (event.args[0].toLowerCase() == "add" && event.args.length >= 2) {
+      require("dev.add", () {
+        var package = event.args[1];
+        var files = event.args;
+        files.remove("add");
+        files.remove(package);
+        add(package, files.join(' '));
+      });
+    } else if (event.args[0].toLowerCase() == "status" && event.args.length == 2) {
+      require("dev.status", () {
+        var package = event.args[1];
+        status(package);
+      });
+    } else if (event.args[0].toLowerCase() == "commit" && event.args.length >= 2) {
+      require("dev.commit", () {
+        var package = event.args[1];
+        var commitMessageSplit = event.args;
+        commitMessageSplit.remove("commit");
+        commitMessageSplit.remove(package);
+        commit(package, commitMessageSplit.join(' '));
+      });
+    }
   });
 }
