@@ -2,7 +2,7 @@ name: ipkg
 version: 1.0.0
 description: Plugin Package Manager for PolymorphicBot
 dependencies:
-  irc: '>=1.4.2 <1.4.6'
+  irc: '>=2.0.0 <3.0.0'
   plugins:
     git: git://github.com/samrg472/plugins.dart.git
   polymorphic_bot:
