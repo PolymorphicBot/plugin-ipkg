@@ -1,7 +1,7 @@
 library ipkg;
 
 import "dart:io";
-import "package:irc/irc.dart" show Color;
+import "package:irc/client.dart" show Color;
 import 'package:polymorphic_bot/api.dart';
 
 String fancyPrefix(String content) => "[${Color.BLUE}${content}${Color.RESET}]";
