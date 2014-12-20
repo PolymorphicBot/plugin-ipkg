@@ -22,9 +22,7 @@ void main(List<String> args, port) {
     void reply(String content) {
       event.reply("${prefix} ${content}");
     }
-    void require(String permission, void handle()) {
-      bot.permission((it) => handle(), event.network, event.channel, event.user, permission);
-    }
+    
     bool checkLocalRepo() {
       if (new File("plugins.json").existsSync()) {
         return true;
@@ -33,6 +31,7 @@ void main(List<String> args, port) {
         return false;
       }
     }
+    
     void install(String queuedPackage) {
       if (!checkLocalRepo()) return;
       ProcessResult p = Process.runSync("git", ["clone", "git://github.com/PolymorphicBot/${queuedPackage}.git", "plugins/${queuedPackage}"]);
@@ -44,6 +43,7 @@ void main(List<String> args, port) {
         }
       }
     }
+    
     void upgrade(String queuedPackage) {
       var p = Process.runSync("git", ["pull"], workingDirectory: "plugins/${queuedPackage}");
       {
@@ -57,6 +57,7 @@ void main(List<String> args, port) {
         }
       }
     }
+    
     void upgradeAll() {
       if (!checkLocalRepo()) return;
       List contents = new Directory('plugins/').listSync();
@@ -89,9 +90,10 @@ void main(List<String> args, port) {
         reply("${success} packages were upgraded, ${fail} packages failed upgrading.");
       }
     }
+    
     void remove(String queuedPackage) {
       if (!checkLocalRepo()) return;
-      ProcessResult p = Process.run("rm", ["-r", "plugins/${queuedPackage}"]);
+      ProcessResult p = Process.runSync("rm", ["-r", "plugins/${queuedPackage}"]);
       {
         if (p.exitCode == 0) {
           reply("${queuedPackage} was removed");
@@ -105,6 +107,7 @@ void main(List<String> args, port) {
         }
       }
     }
+    
     void status(String package) {
       ProcessResult p = Process.runSync("git", ["status", "--short"], workingDirectory: "plugins/${package}");
       {
@@ -116,6 +119,7 @@ void main(List<String> args, port) {
         }
       }
     }
+    
     void add(String package, String files) {
       ProcessResult p = Process.runSync("git", ["add", files], workingDirectory: "plugins/${package}");
       {
@@ -126,6 +130,7 @@ void main(List<String> args, port) {
         }
       }
     }
+    
     void commit(String package, String commitMessage) {
       ProcessResult p = Process.runSync("git", ["commit", "-m" "${commitMessage}"], workingDirectory: "plugins/${package}");
       {
@@ -137,8 +142,9 @@ void main(List<String> args, port) {
         }
       }
     }
-    void push(String package, String args) {
-      var cArgs = ["push",]..addAll(args);
+    
+    void push(String package, List<String> args) {
+      var cArgs = ["push"]..addAll(args);
       ProcessResult p = Process.runSync("git", cArgs, workingDirectory: "plugins/${package}");
       {
         if (p.exitCode == 0) {
@@ -149,57 +155,57 @@ void main(List<String> args, port) {
         }
       }
     }
+    
     void updateRepo() {
-      new HttpClient().getUrl(Uri.parse(repo))
-          .then((HttpClientRequest request) => request.close())
-          .then((HttpClientResponse response) =>
-            response.pipe(new File('plugins.json').openWrite()));
+      new HttpClient().getUrl(Uri.parse(repo)).then((HttpClientRequest request) => request.close()).then((HttpClientResponse response) => response.pipe(new File('plugins.json').openWrite()));
     }
+    
     void reload() {
       bot.send("reload-plugins", {
         "network": event.network
       });
     }
+    
     if (event.args.length == 0) {
       reply("Subcommands: install [package], upgrade [package], upgrade-all, remove [package], update-repo");
     } else if (event.args[0].toLowerCase() == "install" && event.args.length >= 2) {
-      require("manage.install", () {
+      event.require("manage.install", () {
         String queuedPackage = event.args[1];
         reply("Queuing ${queuedPackage} to install");
         install(queuedPackage);
         reload();
       });
     } else if (event.args[0].toLowerCase() == "upgrade" && event.args.length >= 2) {
-      require("manage.upgrade", () {
+      event.require("manage.upgrade", () {
         String queuedPackage = event.args[1];
         reply("Queuing ${queuedPackage} to upgrade");
         upgrade(queuedPackage);
         reload();
       });
     } else if (event.args[0].toLowerCase() == "upgrade-all" && event.args.length == 1) {
-      require("manage.upgrade", () {
+      event.require("manage.upgrade", () {
         reply("Queuing all packages to upgrade");
         upgradeAll();
         reload();
       });
     } else if (event.args[0].toLowerCase() == "remove" && event.args.length == 2) {
-      require("manage.remove", () {
+      event.require("manage.remove", () {
         String queuedPackage = event.args[1];
         reply("Queuing ${queuedPackage} to remove");
         remove(queuedPackage);
         reload();
       });
     } else if (event.args[0].toLowerCase() == "update-repo" && event.args.length == 1) {
-      require("manage.update-repo", () {
+      event.require("manage.update-repo", () {
         reply("Updating repo!");
         updateRepo();
       });
     } else if (event.args[0].toLowerCase() == "queue" && event.args.length == 1) {
-      require("info.queue", () {
+      event.require("info.queue", () {
         reply("Packages in queue: ${Color.CYAN}${packagesQueued}");
       });
     } else if (event.args[0].toLowerCase() == "add" && event.args.length >= 2) {
-      require("dev.add", () {
+      event.require("dev.add", () {
         var package = event.args[1];
         var files = event.args;
         files.remove("add");
@@ -207,12 +213,12 @@ void main(List<String> args, port) {
         add(package, files.join(' '));
       });
     } else if (event.args[0].toLowerCase() == "status" && event.args.length == 2) {
-      require("dev.status", () {
+      event.require("dev.status", () {
         var package = event.args[1];
         status(package);
       });
     } else if (event.args[0].toLowerCase() == "commit" && event.args.length >= 2) {
-      require("dev.commit", () {
+      event.require("dev.commit", () {
         var package = event.args[1];
         var commitMessageSplit = event.args;
         commitMessageSplit.remove("commit");
@@ -220,7 +226,7 @@ void main(List<String> args, port) {
         commit(package, commitMessageSplit.join(' '));
       });
     } else if (event.args[0].toLowerCase() == "push" && event.args.length >= 2) {
-      require("dev.push", () {
+      event.require("dev.push", () {
         var package = event.args[1];
         var args = event.args;
         args.remove("push");
