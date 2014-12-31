@@ -10,15 +10,13 @@ String prefix = fancyPrefix("IPKG");
 String repo = "https://raw.githubusercontent.com/PolymorphicBot/plugins/gh-pages/plugins.json";
 
 BotConnector bot;
-EventManager eventManager;
 
 int packagesQueued = 0;
 
-void main(List<String> args, port) {
-  bot = new BotConnector(port);
-  eventManager = bot.createEventManager();
+void main(List<String> args, Plugin plugin) {
+  bot = plugin.getBot();
 
-  eventManager.command("ipkg", (event) {
+  bot.command("ipkg", (event) {
     void reply(String content) {
       event.reply("${prefix} ${content}");
     }
