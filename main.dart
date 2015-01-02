@@ -128,6 +128,10 @@ void main(List<String> args, Plugin plugin) {
     
     void remove(String queuedPackage) {
       if (!checkLocalRepo()) return;
+      if (!pluginExists(queuedPackage)) {
+        error("Plugin '$queuedPackage' does not exist");
+        return;
+      }
       ProcessResult p = Process.runSync("rm", ["-r", "plugins/${queuedPackage}"]);
       {
         if (p.exitCode == 0) {
