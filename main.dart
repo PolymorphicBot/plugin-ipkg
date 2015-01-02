@@ -20,12 +20,20 @@ void main(List<String> args, Plugin plugin) {
     void reply(String content) {
       event.reply("${prefix} ${content}");
     }
+
+    void info(String infoMsg) {
+      event.reply("${prefix} " + Color.BLUE + infoMsg);
+    }
+
+    void error(String errorMsg) {
+      event.reply("${prefix} " + Color.RED + "Error: ${errorMsg}");
+    }
     
     bool checkLocalRepo() {
       if (new File("plugins.json").existsSync()) {
         return true;
       } else {
-        reply(Color.RED + "Local repo was not found.");
+        error("Local repo not found");
         return false;
       }
     }
@@ -35,23 +43,24 @@ void main(List<String> args, Plugin plugin) {
       ProcessResult p = Process.runSync("git", ["clone", "git://github.com/PolymorphicBot/${queuedPackage}.git", "plugins/${queuedPackage}"]);
       {
         if (p.exitCode == 0) {
-          reply("${queuedPackage} has been successfully installed!");
+          info("${queuedPackage} has been successfully installed!");
         } else {
-          reply("${queuedPackage} failed while the Git clone occurred(error code ${p.exitCode}).");
+          error("${queuedPackage} failed during the Git clone(error code ${p.exitCode}).");
         }
       }
     }
     
     void upgrade(String queuedPackage) {
+      if (!checkLocalRepo()) return;
       var p = Process.runSync("git", ["pull"], workingDirectory: "plugins/${queuedPackage}");
       {
         String stdout = p.stdout;
         if (p.exitCode == 0 && stdout.contains("Already up-to-date.")) {
-          reply("Plugin already up to date!");
+          info("Plugin already up to date!");
         } else if (p.exitCode == 0) {
-          reply("Plugin upgraded!");
+          info("Plugin upgraded!");
         } else {
-          reply("${queuedPackage} failed to be upgraded(${p.exitCode}).");
+          error("${queuedPackage} failed to be upgraded(${p.exitCode}).");
         }
       }
     }
@@ -83,9 +92,9 @@ void main(List<String> args, Plugin plugin) {
         }
       }
       if (success == 0 && fail == 0) {
-        reply("No operations were performed on ${latest} packages.");
+        info("No operations were performed on ${latest} packages.");
       } else {
-        reply("${success} packages were upgraded, ${fail} packages failed upgrading.");
+        info("${success} packages were upgraded, ${fail} packages failed upgrading.");
       }
     }
     
@@ -94,9 +103,9 @@ void main(List<String> args, Plugin plugin) {
       ProcessResult p = Process.runSync("rm", ["-r", "plugins/${queuedPackage}"]);
       {
         if (p.exitCode == 0) {
-          reply("${queuedPackage} was removed");
+          info("${queuedPackage} was removed");
         } else {
-          reply("${queuedPackage} failed to be removed(${p.exitCode}).");
+          error("${queuedPackage} failed to be removed(${p.exitCode}).");
           print("PACKAGE FAILED");
           print("==============");
           print(queuedPackage);
@@ -113,7 +122,7 @@ void main(List<String> args, Plugin plugin) {
           var split = p.stdout.trim().split('\n');
           split.forEach(event.replyNotice);
         } else {
-          reply("Not a git repository.");
+          error("Not a git repository.");
         }
       }
     }
@@ -122,9 +131,9 @@ void main(List<String> args, Plugin plugin) {
       ProcessResult p = Process.runSync("git", ["add", files], workingDirectory: "plugins/${package}");
       {
         if (p.exitCode == 0) {
-          reply("Success!");
+          info("Success");
         } else {
-          reply("Failure.");
+          error("Failure");
         }
       }
     }
@@ -133,9 +142,9 @@ void main(List<String> args, Plugin plugin) {
       ProcessResult p = Process.runSync("git", ["commit", "-m" "${commitMessage}"], workingDirectory: "plugins/${package}");
       {
         if (p.exitCode == 0) {
-          reply("Commit successful(${commitMessage}).");
+          info("Commit successful(${commitMessage}).");
         } else {
-          reply("Commit failed.");
+          error("Commit failed.");
           // TODO implement logging when log system is finished.
         }
       }
@@ -146,10 +155,10 @@ void main(List<String> args, Plugin plugin) {
       ProcessResult p = Process.runSync("git", cArgs, workingDirectory: "plugins/${package}");
       {
         if (p.exitCode == 0) {
-          reply("Push success.");
+          info("Push success.");
         } else {
-          reply("Push failed.");
-          reply(p.stderr);
+          error("Push failed.");
+          error(p.stderr);
         }
       }
     }
@@ -165,42 +174,42 @@ void main(List<String> args, Plugin plugin) {
     }
     
     if (event.args.length == 0) {
-      reply("Subcommands: install [package], upgrade [package], upgrade-all, remove [package], update-repo");
+      info("Subcommands: install [package], upgrade [package], upgrade-all, remove [package], update-repo");
     } else if (event.args[0].toLowerCase() == "install" && event.args.length >= 2) {
       event.require("manage.install", () {
         String queuedPackage = event.args[1];
-        reply("Queuing ${queuedPackage} to install");
+        info("Queuing ${queuedPackage} to install");
         install(queuedPackage);
         reload();
       });
     } else if (event.args[0].toLowerCase() == "upgrade" && event.args.length >= 2) {
       event.require("manage.upgrade", () {
         String queuedPackage = event.args[1];
-        reply("Queuing ${queuedPackage} to upgrade");
+        info("Queuing ${queuedPackage} to upgrade");
         upgrade(queuedPackage);
         reload();
       });
     } else if (event.args[0].toLowerCase() == "upgrade-all" && event.args.length == 1) {
       event.require("manage.upgrade", () {
-        reply("Queuing all packages to upgrade");
+        info("Queuing all packages to upgrade");
         upgradeAll();
         reload();
       });
     } else if (event.args[0].toLowerCase() == "remove" && event.args.length == 2) {
       event.require("manage.remove", () {
         String queuedPackage = event.args[1];
-        reply("Queuing ${queuedPackage} to remove");
+        info("Queuing ${queuedPackage} to remove");
         remove(queuedPackage);
         reload();
       });
     } else if (event.args[0].toLowerCase() == "update-repo" && event.args.length == 1) {
       event.require("manage.update-repo", () {
-        reply("Updating repo!");
+        info("Updating repository...");
         updateRepo();
       });
     } else if (event.args[0].toLowerCase() == "queue" && event.args.length == 1) {
       event.require("info.queue", () {
-        reply("Packages in queue: ${Color.CYAN}${packagesQueued}");
+        info("Packages in queue: ${Color.CYAN}${packagesQueued}");
       });
     } else if (event.args[0].toLowerCase() == "add" && event.args.length >= 2) {
       event.require("dev.add", () {
