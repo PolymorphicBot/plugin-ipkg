@@ -31,12 +31,11 @@ void main(List<String> args, Plugin plugin) {
     }
     
     bool checkLocalRepo() {
-      if (new File("plugins.json").existsSync()) {
-        return true;
-      } else {
-        error("Local repo not found");
-        return false;
-      }
+      return new File("plugins.json").existsSync();
+    }
+
+    bool pluginExists(String pluginName) {
+      return new Directory("plugins/$pluginName").existsSync();
     }
 
     Future<String> getPluginJson() {
@@ -59,6 +58,10 @@ void main(List<String> args, Plugin plugin) {
     
     void install(String queuedPackage) {
       if (!checkLocalRepo()) return;
+      if (pluginExists(queuedPackage)) {
+        error("Plugin '$queuedPackage' already exists");
+        return;
+      }
       getPluginCloneUrl(queuedPackage).then((cloneUrl) {
         if (cloneUrl == null) {
           error("Package not found");
