@@ -1,5 +1,6 @@
 library ipkg;
 
+import "dart:convert";
 import "dart:io";
 import "package:irc/client.dart" show Color;
 import 'package:polymorphic_bot/api.dart';
@@ -37,18 +38,42 @@ void main(List<String> args, Plugin plugin) {
         return false;
       }
     }
+
+    Future<String> getPluginJson() {
+      return new File("plugins.json").readAsString();
+    }
+
+    Future<String> getPluginCloneUrl(String packageName, {bool ssh: false}) {
+      return getPluginJson().then((text) {
+        var json = JSON.decode(text);
+        if (json[packageName] == null) {
+          return null;
+        }
+        if (ssh) {
+          return json[packageName]["git-ssh"];
+        } else {
+          return json[packageName]["git-https"];
+        }
+      });
+    }
     
     void install(String queuedPackage) {
       if (!checkLocalRepo()) return;
-      ProcessResult p = Process.runSync("git", ["clone", "git://github.com/PolymorphicBot/${queuedPackage}.git", "plugins/${queuedPackage}"]);
-      {
-        if (p.exitCode == 0) {
-          info("${queuedPackage} has been successfully installed!");
-        } else {
-          error("${queuedPackage} failed during the Git clone(error code ${p.exitCode}).");
+      getPluginCloneUrl(queuedPackage).then((cloneUrl) {
+        if (cloneUrl == null) {
+          error("Package not found");
+          return;
         }
-      }
-    }
+        ProcessResult p = Process.runSync("git", ["clone", cloneUrl, "plugins/${queuedPackage}"]);
+        {
+          if (p.exitCode == 0) {
+            info("${queuedPackage} has been successfully installed!");
+          } else {
+            error("${queuedPackage} failed during the Git clone(error code ${p.exitCode}).");
+          }
+        }
+      });
+  }
     
     void upgrade(String queuedPackage) {
       if (!checkLocalRepo()) return;
@@ -115,54 +140,6 @@ void main(List<String> args, Plugin plugin) {
       }
     }
     
-    void status(String package) {
-      ProcessResult p = Process.runSync("git", ["status", "--short"], workingDirectory: "plugins/${package}");
-      {
-        if (p.exitCode == 0) {
-          var split = p.stdout.trim().split('\n');
-          split.forEach(event.replyNotice);
-        } else {
-          error("Not a git repository.");
-        }
-      }
-    }
-    
-    void add(String package, String files) {
-      ProcessResult p = Process.runSync("git", ["add", files], workingDirectory: "plugins/${package}");
-      {
-        if (p.exitCode == 0) {
-          info("Success");
-        } else {
-          error("Failure");
-        }
-      }
-    }
-    
-    void commit(String package, String commitMessage) {
-      ProcessResult p = Process.runSync("git", ["commit", "-m" "${commitMessage}"], workingDirectory: "plugins/${package}");
-      {
-        if (p.exitCode == 0) {
-          info("Commit successful(${commitMessage}).");
-        } else {
-          error("Commit failed.");
-          // TODO implement logging when log system is finished.
-        }
-      }
-    }
-    
-    void push(String package, List<String> args) {
-      var cArgs = ["push"]..addAll(args);
-      ProcessResult p = Process.runSync("git", cArgs, workingDirectory: "plugins/${package}");
-      {
-        if (p.exitCode == 0) {
-          info("Push success.");
-        } else {
-          error("Push failed.");
-          error(p.stderr);
-        }
-      }
-    }
-    
     void updateRepo() {
       new HttpClient().getUrl(Uri.parse(repo)).then((HttpClientRequest request) => request.close()).then((HttpClientResponse response) => response.pipe(new File('plugins.json').openWrite()));
     }
@@ -174,71 +151,38 @@ void main(List<String> args, Plugin plugin) {
     }
     
     if (event.args.length == 0) {
-      info("Subcommands: install [package], upgrade [package], upgrade-all, remove [package], update-repo");
+      info("Usage: install [package], upgrade [package], upgrade-all, remove [package], update-repo");
     } else if (event.args[0].toLowerCase() == "install" && event.args.length >= 2) {
       event.require("manage.install", () {
         String queuedPackage = event.args[1];
-        info("Queuing ${queuedPackage} to install");
+        info("Installing ${queuedPackage}");
         install(queuedPackage);
-        reload();
       });
     } else if (event.args[0].toLowerCase() == "upgrade" && event.args.length >= 2) {
       event.require("manage.upgrade", () {
         String queuedPackage = event.args[1];
-        info("Queuing ${queuedPackage} to upgrade");
+        info("Upgrading ${queuedPackage}");
         upgrade(queuedPackage);
-        reload();
       });
     } else if (event.args[0].toLowerCase() == "upgrade-all" && event.args.length == 1) {
       event.require("manage.upgrade", () {
-        info("Queuing all packages to upgrade");
+        info("Upgrading all packages");
         upgradeAll();
-        reload();
       });
     } else if (event.args[0].toLowerCase() == "remove" && event.args.length == 2) {
       event.require("manage.remove", () {
         String queuedPackage = event.args[1];
-        info("Queuing ${queuedPackage} to remove");
+        info("Removing ${queuedPackage}");
         remove(queuedPackage);
-        reload();
       });
     } else if (event.args[0].toLowerCase() == "update-repo" && event.args.length == 1) {
       event.require("manage.update-repo", () {
-        info("Updating repository...");
+        info("Updating repository");
         updateRepo();
       });
     } else if (event.args[0].toLowerCase() == "queue" && event.args.length == 1) {
       event.require("info.queue", () {
         info("Packages in queue: ${Color.CYAN}${packagesQueued}");
-      });
-    } else if (event.args[0].toLowerCase() == "add" && event.args.length >= 2) {
-      event.require("dev.add", () {
-        var package = event.args[1];
-        var files = event.args;
-        files.remove("add");
-        files.remove(package);
-        add(package, files.join(' '));
-      });
-    } else if (event.args[0].toLowerCase() == "status" && event.args.length == 2) {
-      event.require("dev.status", () {
-        var package = event.args[1];
-        status(package);
-      });
-    } else if (event.args[0].toLowerCase() == "commit" && event.args.length >= 2) {
-      event.require("dev.commit", () {
-        var package = event.args[1];
-        var commitMessageSplit = event.args;
-        commitMessageSplit.remove("commit");
-        commitMessageSplit.remove(package);
-        commit(package, commitMessageSplit.join(' '));
-      });
-    } else if (event.args[0].toLowerCase() == "push" && event.args.length >= 2) {
-      event.require("dev.push", () {
-        var package = event.args[1];
-        var args = event.args;
-        args.remove("push");
-        args.remove(package);
-        push(package, args);
       });
     }
   });
