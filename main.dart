@@ -1,5 +1,6 @@
 library ipkg;
 
+import "dart:async";
 import "dart:convert";
 import "dart:io";
 import "package:irc/client.dart" show Color;
