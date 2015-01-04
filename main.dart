@@ -153,9 +153,7 @@ void main(List<String> args, Plugin plugin) {
     }
     
     void reload() {
-      plugin.send("reload-plugins", {
-        "network": event.network
-      });
+      bot.reloadPlugins();
     }
     
     if (event.args.length == 0) {
